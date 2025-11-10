@@ -29,7 +29,7 @@
           <v-btn
             variant="text"
             class="text-white"
-            :loading="authStore.status === 'loading'"
+            :loading="isAuthLoading"
             @click="handleLogout"
           >
             Logout
@@ -69,40 +69,54 @@
   </v-app>
 </template>
 
-<script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, RouterView, useRouter } from 'vue-router'
+<script lang="ts">
+import { defineComponent } from 'vue'
+import { RouterLink, RouterView } from 'vue-router'
+import { mapStores } from 'pinia'
 
 import { useAuthStore } from '@/stores/auth'
 
-const authStore = useAuthStore()
-const router = useRouter()
-
-const showSnackbar = ref(false)
-const snackbarMessage = ref('')
-
-const isAuthenticated = computed(() => authStore.isAuthenticated)
-
-watch(
-  () => authStore.error,
-  (message) => {
-    if (message) {
-      snackbarMessage.value = message
-      showSnackbar.value = true
-    } else {
-      showSnackbar.value = false
+export default defineComponent({
+  name: 'App',
+  components: {
+    RouterLink,
+    RouterView,
+  },
+  data() {
+    return {
+      showSnackbar: false,
+      snackbarMessage: '',
     }
-  }
-)
-
-onMounted(async () => {
-  await authStore.bootstrap()
+  },
+  computed: {
+    ...mapStores(useAuthStore),
+    isAuthenticated(): boolean {
+      return this.authStore.isAuthenticated
+    },
+    isAuthLoading(): boolean {
+      return this.authStore.status === 'loading'
+    },
+  },
+  watch: {
+    'authStore.error'(message: string | null) {
+      if (message) {
+        this.snackbarMessage = message
+        this.showSnackbar = true
+      } else {
+        this.showSnackbar = false
+      }
+    },
+  },
+  async mounted() {
+    await this.authStore.bootstrap()
+  },
+  methods: {
+    async handleLogout() {
+      await this.authStore.logout()
+      this.$router.push({ name: 'home' })
+    },
+  },
 })
-
-const handleLogout = async () => {
-  await authStore.logout()
-  router.push({ name: 'home' })
-}
 </script>
 
 <style scoped>

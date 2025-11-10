@@ -123,10 +123,11 @@
   </v-container>
 </template>
 
-<script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useDisplay } from 'vuetify'
+<script lang="ts">
+import { defineComponent } from 'vue'
+import { mapStores } from 'pinia'
 import { isAxiosError } from 'axios'
+import { useDisplay } from 'vuetify'
 
 import ArticleCard from '@/components/ArticleCard.vue'
 import { fetchTopHeadlines, searchArticles } from '@/services/news'
@@ -134,114 +135,132 @@ import { useAuthStore } from '@/stores/auth'
 import type { Article } from '@/types/api'
 
 type Mode = 'headlines' | 'search'
+type FeedbackType = 'info' | 'error'
+type DisplayRef = ReturnType<typeof useDisplay>
 
-const authStore = useAuthStore()
-const { xs } = useDisplay()
-
-const articles = ref<Article[]>([])
-const loading = ref(false)
-const errorMessage = ref<string | null>(null)
-const searchFeedback = ref<string | null>(null)
-const searchFeedbackType = ref<'info' | 'error'>('info')
-const searchTerm = ref('')
-const selectedCategory = ref<string | null>(null)
-const selectedLanguage = ref('en')
-const currentMode = ref<Mode>('headlines')
-
-const categories = [
-  { title: 'All Categories', value: null },
-  { title: 'Business', value: 'business' },
-  { title: 'Entertainment', value: 'entertainment' },
-  { title: 'General', value: 'general' },
-  { title: 'Health', value: 'health' },
-  { title: 'Science', value: 'science' },
-  { title: 'Sports', value: 'sports' },
-  { title: 'Technology', value: 'technology' },
-]
-
-const languages = [
-  { title: 'English', value: 'en' },
-  { title: 'French', value: 'fr' },
-  { title: 'German', value: 'de' },
-  { title: 'Spanish', value: 'es' },
-]
-
-const isAuthenticated = computed(() => authStore.isAuthenticated)
-const isXs = computed(() => xs.value)
-
-const loadHeadlines = async () => {
-  loading.value = true
-  errorMessage.value = null
-  searchFeedback.value = null
-  currentMode.value = 'headlines'
-
-  try {
-    articles.value = await fetchTopHeadlines({
-      category: selectedCategory.value ?? undefined,
-    })
-  } catch (error) {
-    if (isAxiosError(error)) {
-      errorMessage.value =
-        error.response?.data?.detail ?? 'Unable to load headlines. Please try again later.'
-    } else {
-      errorMessage.value = 'Unable to load headlines. Please try again later.'
+export default defineComponent({
+  name: 'HomeView',
+  components: {
+    ArticleCard,
+  },
+  setup(): { displayRef: DisplayRef } {
+    const display = useDisplay()
+    return {
+      displayRef: display,
     }
-  } finally {
-    loading.value = false
-  }
-}
-
-const onSearch = async () => {
-  if (!isAuthenticated.value) {
-    searchFeedback.value = 'Sign in to unlock global news search.'
-    searchFeedbackType.value = 'info'
-    return
-  }
-
-  if (!searchTerm.value) {
-    searchFeedback.value = 'Enter a keyword or phrase to start searching.'
-    searchFeedbackType.value = 'info'
-    return
-  }
-
-  loading.value = true
-  errorMessage.value = null
-  searchFeedback.value = null
-  currentMode.value = 'search'
-
-  try {
-    articles.value = await searchArticles({
-      q: searchTerm.value,
-      language: selectedLanguage.value,
-      sortBy: 'publishedAt',
-    })
-
-    if (!articles.value.length) {
-      searchFeedback.value = 'No articles matched your search. Try a different keyword.'
-      searchFeedbackType.value = 'info'
+  },
+  data() {
+    return {
+      articles: [] as Article[],
+      loading: false,
+      errorMessage: null as string | null,
+      searchFeedback: null as string | null,
+      searchFeedbackType: 'info' as FeedbackType,
+      searchTerm: '',
+      selectedCategory: null as string | null,
+      selectedLanguage: 'en',
+      currentMode: 'headlines' as Mode,
+      categories: [
+        { title: 'All Categories', value: null },
+        { title: 'Business', value: 'business' },
+        { title: 'Entertainment', value: 'entertainment' },
+        { title: 'General', value: 'general' },
+        { title: 'Health', value: 'health' },
+        { title: 'Science', value: 'science' },
+        { title: 'Sports', value: 'sports' },
+        { title: 'Technology', value: 'technology' },
+      ],
+      languages: [
+        { title: 'English', value: 'en' },
+        { title: 'French', value: 'fr' },
+        { title: 'German', value: 'de' },
+        { title: 'Spanish', value: 'es' },
+      ],
     }
-  } catch (error) {
-    if (isAxiosError(error)) {
-      if (error.response?.status === 401) {
-        searchFeedback.value = 'Your session has expired. Please sign in again to continue.'
-        searchFeedbackType.value = 'error'
-        await authStore.refreshSession()
-      } else {
-        searchFeedback.value =
-          error.response?.data?.detail ?? 'Search failed. Please try again in a moment.'
-        searchFeedbackType.value = 'error'
+  },
+  computed: {
+    ...mapStores(useAuthStore),
+    isAuthenticated(): boolean {
+      return this.authStore.isAuthenticated
+    },
+    isXs(): boolean {
+      return this.displayRef.xs.value
+    },
+  },
+  async mounted() {
+    await this.loadHeadlines()
+  },
+  methods: {
+    async loadHeadlines() {
+      this.loading = true
+      this.errorMessage = null
+      this.searchFeedback = null
+      this.currentMode = 'headlines'
+
+      try {
+        this.articles = await fetchTopHeadlines({
+          category: this.selectedCategory ?? undefined,
+        })
+      } catch (error) {
+        if (isAxiosError(error)) {
+          this.errorMessage =
+            error.response?.data?.detail ?? 'Unable to load headlines. Please try again later.'
+        } else {
+          this.errorMessage = 'Unable to load headlines. Please try again later.'
+        }
+      } finally {
+        this.loading = false
       }
-    } else {
-      searchFeedback.value = 'Search failed. Please try again in a moment.'
-      searchFeedbackType.value = 'error'
-    }
-  } finally {
-    loading.value = false
-  }
-}
+    },
+    async onSearch() {
+      if (!this.isAuthenticated) {
+        this.searchFeedback = 'Sign in to unlock global news search.'
+        this.searchFeedbackType = 'info'
+        return
+      }
 
-onMounted(async () => {
-  await loadHeadlines()
+      if (!this.searchTerm) {
+        this.searchFeedback = 'Enter a keyword or phrase to start searching.'
+        this.searchFeedbackType = 'info'
+        return
+      }
+
+      this.loading = true
+      this.errorMessage = null
+      this.searchFeedback = null
+      this.currentMode = 'search'
+
+      try {
+        this.articles = await searchArticles({
+          q: this.searchTerm,
+          language: this.selectedLanguage,
+          sortBy: 'publishedAt',
+        })
+
+        if (!this.articles.length) {
+          this.searchFeedback = 'No articles matched your search. Try a different keyword.'
+          this.searchFeedbackType = 'info'
+        }
+      } catch (error) {
+        if (isAxiosError(error)) {
+          if (error.response?.status === 401) {
+            this.searchFeedback = 'Your session has expired. Please sign in again to continue.'
+            this.searchFeedbackType = 'error'
+            await this.authStore.refreshSession()
+          } else {
+            this.searchFeedback =
+              error.response?.data?.detail ?? 'Search failed. Please try again in a moment.'
+            this.searchFeedbackType = 'error'
+          }
+        } else {
+          this.searchFeedback = 'Search failed. Please try again in a moment.'
+          this.searchFeedbackType = 'error'
+        }
+      } finally {
+        this.loading = false
+      }
+    },
+  },
 })
 </script>
 

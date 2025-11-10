@@ -55,68 +55,81 @@
   </v-container>
 </template>
 
-<script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+<script lang="ts">
+import { defineComponent } from 'vue'
+import { RouterLink } from 'vue-router'
+import { mapStores } from 'pinia'
 
 import { useAuthStore } from '@/stores/auth'
 
-const authStore = useAuthStore()
-const router = useRouter()
-const route = useRoute()
+type FieldErrors = Record<string, string | undefined>
 
-const form = reactive({
-  username: '',
-  password: '',
-})
-
-const fieldErrors = ref<Record<string, string | undefined>>({})
-const showPassword = ref(false)
-
-const isLoading = computed(() => authStore.status === 'loading')
-
-authStore.clearError()
-
-const validate = () => {
-  const errors: Record<string, string> = {}
-
-  if (!form.username) {
-    errors.username = 'Username is required'
-  }
-
-  if (!form.password) {
-    errors.password = 'Password is required'
-  }
-
-  fieldErrors.value = errors
-  return Object.keys(errors).length === 0
-}
-
-const onSubmit = async () => {
-  if (!validate()) {
-    return
-  }
-
-  try {
-    await authStore.login({
-      username: form.username,
-      password: form.password,
-    })
-
-    authStore.clearError()
-    const redirectTarget = route.query.redirect
-    if (typeof redirectTarget === 'string' && redirectTarget) {
-      await router.push(redirectTarget)
-    } else {
-      await router.push({ name: 'home' })
+export default defineComponent({
+  name: 'LoginView',
+  components: {
+    RouterLink,
+  },
+  data() {
+    return {
+      form: {
+        username: '',
+        password: '',
+      },
+      fieldErrors: {} as FieldErrors,
+      showPassword: false,
     }
-  } catch (error) {
-    // Error state handled by the store and surfaced via authStore.error
-  }
-}
+  },
+  computed: {
+    ...mapStores(useAuthStore),
+    isLoading(): boolean {
+      return this.authStore.status === 'loading'
+    },
+  },
+  created() {
+    this.authStore.clearError()
+  },
+  beforeUnmount() {
+    this.authStore.clearError()
+  },
+  methods: {
+    validate(): boolean {
+      const errors: FieldErrors = {}
 
-onBeforeUnmount(() => {
-  authStore.clearError()
+      if (!this.form.username) {
+        errors.username = 'Username is required'
+      }
+
+      if (!this.form.password) {
+        errors.password = 'Password is required'
+      }
+
+      this.fieldErrors = errors
+      return Object.keys(errors).length === 0
+    },
+    async onSubmit() {
+      if (!this.validate()) {
+        return
+      }
+
+      try {
+        await this.authStore.login({
+          username: this.form.username,
+          password: this.form.password,
+        })
+
+        this.authStore.clearError()
+        const redirectTarget = this.$route.query.redirect
+
+        if (typeof redirectTarget === 'string' && redirectTarget) {
+          await this.$router.push(redirectTarget)
+        } else {
+          await this.$router.push({ name: 'home' })
+        }
+      } catch (error) {
+        // handled by auth store
+      }
+    },
+  },
 })
 </script>
 

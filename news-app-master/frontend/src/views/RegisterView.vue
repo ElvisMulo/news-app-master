@@ -79,85 +79,98 @@
   </v-container>
 </template>
 
-<script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+<script lang="ts">
+import { defineComponent } from 'vue'
+import { RouterLink } from 'vue-router'
+import { mapStores } from 'pinia'
 
 import { useAuthStore } from '@/stores/auth'
 
-const authStore = useAuthStore()
-const router = useRouter()
-const route = useRoute()
+type FieldErrors = Record<string, string | undefined>
 
-const form = reactive({
-  username: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-})
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-const fieldErrors = ref<Record<string, string | undefined>>({})
-const showPassword = ref(false)
-
-const isLoading = computed(() => authStore.status === 'loading')
-
-authStore.clearError()
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-const validate = () => {
-  const errors: Record<string, string> = {}
-
-  if (!form.username) {
-    errors.username = 'Username is required'
-  }
-
-  if (form.email && !emailPattern.test(form.email)) {
-    errors.email = 'Enter a valid email address'
-  }
-
-  if (!form.password) {
-    errors.password = 'Password is required'
-  } else if (form.password.length < 6) {
-    errors.password = 'Password must be at least 6 characters'
-  }
-
-  if (!form.confirmPassword) {
-    errors.confirmPassword = 'Please confirm your password'
-  } else if (form.password !== form.confirmPassword) {
-    errors.confirmPassword = 'Passwords do not match'
-  }
-
-  fieldErrors.value = errors
-  return Object.keys(errors).length === 0
-}
-
-const onSubmit = async () => {
-  if (!validate()) {
-    return
-  }
-
-  try {
-    await authStore.register({
-      username: form.username,
-      password: form.password,
-      email: form.email || undefined,
-    })
-
-    authStore.clearError()
-    const redirectTarget = route.query.redirect
-    if (typeof redirectTarget === 'string' && redirectTarget) {
-      await router.push(redirectTarget)
-    } else {
-      await router.push({ name: 'home' })
+export default defineComponent({
+  name: 'RegisterView',
+  components: {
+    RouterLink,
+  },
+  data() {
+    return {
+      form: {
+        username: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+      },
+      fieldErrors: {} as FieldErrors,
+      showPassword: false,
     }
-  } catch (error) {
-    // Error state handled by the store and surfaced via authStore.error
-  }
-}
+  },
+  computed: {
+    ...mapStores(useAuthStore),
+    isLoading(): boolean {
+      return this.authStore.status === 'loading'
+    },
+  },
+  created() {
+    this.authStore.clearError()
+  },
+  beforeUnmount() {
+    this.authStore.clearError()
+  },
+  methods: {
+    validate(): boolean {
+      const errors: FieldErrors = {}
 
-onBeforeUnmount(() => {
-  authStore.clearError()
+      if (!this.form.username) {
+        errors.username = 'Username is required'
+      }
+
+      if (this.form.email && !EMAIL_PATTERN.test(this.form.email)) {
+        errors.email = 'Enter a valid email address'
+      }
+
+      if (!this.form.password) {
+        errors.password = 'Password is required'
+      } else if (this.form.password.length < 6) {
+        errors.password = 'Password must be at least 6 characters'
+      }
+
+      if (!this.form.confirmPassword) {
+        errors.confirmPassword = 'Please confirm your password'
+      } else if (this.form.password !== this.form.confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match'
+      }
+
+      this.fieldErrors = errors
+      return Object.keys(errors).length === 0
+    },
+    async onSubmit() {
+      if (!this.validate()) {
+        return
+      }
+
+      try {
+        await this.authStore.register({
+          username: this.form.username,
+          password: this.form.password,
+          email: this.form.email || undefined,
+        })
+
+        this.authStore.clearError()
+        const redirectTarget = this.$route.query.redirect
+
+        if (typeof redirectTarget === 'string' && redirectTarget) {
+          await this.$router.push(redirectTarget)
+        } else {
+          await this.$router.push({ name: 'home' })
+        }
+      } catch (error) {
+        // handled by auth store
+      }
+    },
+  },
 })
 </script>
 

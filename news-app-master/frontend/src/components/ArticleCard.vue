@@ -1,7 +1,7 @@
 <template>
   <v-card elevation="2" class="article-card h-100 d-flex flex-column">
     <v-img
-      :src="article.urlToImage || fallbackImage"
+      :src="imageSource"
       height="180"
       cover
       class="rounded-t"
@@ -50,14 +50,27 @@
   </v-card>
 </template>
 
-<script setup lang="ts">
+<script lang="ts">
+import { defineComponent, type PropType } from 'vue'
+
 import type { Article } from '@/types/api'
 
-defineProps<{
-  article: Article
-}>()
+const FALLBACK_IMAGE = 'https://via.placeholder.com/600x400.png?text=No+Image+Available'
 
-const fallbackImage = 'https://via.placeholder.com/600x400.png?text=No+Image+Available'
+export default defineComponent({
+  name: 'ArticleCard',
+  props: {
+    article: {
+      type: Object as PropType<Article>,
+      required: true,
+    },
+  },
+  computed: {
+    imageSource(): string {
+      return this.article.urlToImage || FALLBACK_IMAGE
+    },
+  },
+})
 </script>
 
 <style scoped>
